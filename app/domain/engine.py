@@ -99,26 +99,29 @@ def review(case: Case, ruleset: dict):
         check('unknown_'+fid,'未對應因素','pending',f'因素 {fid} 未包含在此版本基準中。')
         ready={'individual':False,'regional':False}
     t=case.totals
+    def total_page(field):
+        evidence = case.total_evidence.get(field)
+        return evidence.page if case.document_id and evidence and evidence.quote.strip() else None
     # Arithmetic consistency uses entered values. Normative totals use independently recomputed values.
     for scope,field,label in [('individual','individual','個別因素合計'),('regional','regional_detail','表 5-2 區域因素總修正數')]:
         entered=[number(factors[r['id']].entered_rate) if r['id'] in factors else None for r in ruleset['rules'] if r['scope']==scope]
         actual=number(getattr(t,field))
         if t and case.totals_confirmed and all(x is not None for x in entered):
             expected=sum(entered,Decimal(0))
-            check('sum_'+field,label+'・填值加總','pass' if actual==expected else 'error','依各細項原填修正率加總。',float(actual) if actual is not None else None,float(expected),total_field=field,page=3 if scope=='individual' else 2)
+            check('sum_'+field,label+'・填值加總','pass' if actual==expected else 'error','依各細項原填修正率加總。',float(actual) if actual is not None else None,float(expected),total_field=field,page=total_page(field))
         if ready[scope] and case.totals_confirmed:
             expected=sums[scope]
-            check('norm_'+field,label+'・基準重算','pass' if actual==expected else 'error','依已確認資料與基準矩陣重新計算。',float(actual) if actual is not None else None,float(expected),total_field=field,page=3 if scope=='individual' else 2)
+            check('norm_'+field,label+'・基準重算','pass' if actual==expected else 'error','依已確認資料與基準矩陣重新計算。',float(actual) if actual is not None else None,float(expected),total_field=field,page=total_page(field))
         else:
-            check('norm_'+field,label+'・基準重算','pending','上游資料或基準待確認，暫不判定總修正數。',page=3 if scope=='individual' else 2)
+            check('norm_'+field,label+'・基準重算','pending','上游資料或基準待確認，暫不判定總修正數。',total_field=field,page=total_page(field))
     def total_check(key,title,actual,expected,msg,field):
         if not case.totals_confirmed or expected is None or actual is None:
-            check(key,title,'pending','總計欄位未確認或計算資料不足。',actual,total_field=field,page=3);return
+            check(key,title,'pending','總計欄位未確認或計算資料不足。',actual,total_field=field,page=total_page(field));return
         status='pass' if number(actual)==expected else 'error'
         if field in ['adjusted_price','trial_price'] and status=='error' and abs(number(actual)-expected)<=1:
             status='pending'
             msg+=' 與顯示值重算結果相差不超過 1 元，可能涉及中間值精度；請核對原始計算式，暫不認定填錯。'
-        check(key,title,status,msg,actual,float(expected),total_field=field,page=3)
+        check(key,title,status,msg,actual,float(expected),total_field=field,page=total_page(field))
     total_check('cross','跨表抄填',t.regional_carried,number(t.regional_detail),'表 4 區域因素調整率應等於表 5-2 總修正數。','regional_carried')
     rates=[number(f.entered_rate) for f in case.factors if not f.exempt]
     expected_abs=None

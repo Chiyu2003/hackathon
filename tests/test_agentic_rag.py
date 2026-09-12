@@ -150,3 +150,93 @@ def test_agent_http_is_explicit_and_read_only(tmp_path,monkeypatch):
         result=client.post(url,json=dict(body,cloud_data_approved=True))
         assert result.status_code==200 and result.json()['review']['complete'] is False
         assert client.get('/api/cases/'+case['id']).json()['case']==case
+
+
+def test_rule_error_provides_exact_ids_and_can_recover(setup):
+    repo, case = setup
+    class RepairRule:
+        def next_turn(self, context, history, tools):
+            schema = next(t for t in tools if t['name'] == 'get_rule')['input_schema']
+            assert 'width' in schema['properties']['rule_id']['enum']
+            if not history:
+                return AgentTurn(calls=(call('bad', 'get_rule', rule_id=context['ruleset_id']+'.width'),))
+            if len(history) == 1:
+                assert 'width' in history[-1]['results'][0]['data']['valid_rule_ids']
+                return finish()  # Reproduce premature stop after the failed tool.
+            if len(history) == 2:
+                assert 'feedback' in history[-1]
+                return AgentTurn(calls=(call('fixed', 'get_rule', rule_id='width'), call('review', 'review_case')))
+            return finish()
+    result = AgenticRagService(repo, LocalEvidenceRetriever(repo), RepairRule()).query(case.id, case.revision, '查寬度並審查', True)
+    assert [t['status'] for t in result['tool_trace']] == ['error', 'success', 'success']
+    assert result['review'] is not None and result['statements'] == []
+
+
+@pytest.mark.parametrize('repair_succeeds', [True, False])
+def test_invalid_rule_citation_repair_preserves_calculation(setup, repair_succeeds):
+    repo, case = setup
+    class RepairCitation:
+        def next_turn(self, context, history, tools):
+            if not history:
+                return AgentTurn(calls=(call('s', 'search_evidence', question='寬度'), call('r', 'review_case')))
+            if len(history) == 1:
+                return finish('width')
+            assert len(history) == 2  # Only one correction attempt.
+            valid_ids = history[-1]['feedback']['valid_citation_ids']
+            assert valid_ids and 'width' not in valid_ids
+            return finish(valid_ids[0] if repair_succeeds else 'width')
+    result = AgenticRagService(repo, LocalEvidenceRetriever(repo), RepairCitation()).query(case.id, case.revision, '查來源並審查', True)
+    assert result['review'] is not None
+    assert result['status'] == ('draft' if repair_succeeds else 'insufficient_evidence')
+    assert all('width' not in s['citation_ids'] for s in result['statements'])
+    assert repo.get_case(case.id) == case
+
+
+def test_native_repair_feedback_uses_user_text_and_preserves_assistant_message(setup):
+    repo, _ = setup
+    client = NativeClient()
+    transport = BedrockFieldExtractor(Settings(data_dir=repo.data_dir), repo, client=client)
+    transport.gate.wait = lambda: None
+    continuation = dict(role='assistant', content=[dict(text='{"statements":[],"insufficient_evidence":true}')])
+    history = [dict(continuation=continuation, feedback=dict(valid_citation_ids=['source']))]
+    BedrockAgentModel(transport).next_turn({'question': 'test'}, history, tool_catalog())
+    messages = client.calls[0]['messages']
+    assert messages[1] == continuation
+    assert messages[2] == {'role': 'user', 'content': [{'text': '{"valid_citation_ids": ["source"]}'}]}
+
+
+@pytest.mark.parametrize('text', ['not JSON', '{"statements":[{"text":"無引用","citation_ids":[]}],"insufficient_evidence":false}'])
+def test_invalid_native_answer_can_be_repaired_without_losing_tools(setup, text):
+    repo, case = setup
+    class Client:
+        def __init__(self): self.calls = []
+        def converse(self, **kwargs):
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                return dict(stopReason='tool_use', output=dict(message=dict(role='assistant', content=[
+                    dict(toolUse=dict(toolUseId='review', name='review_case', input={}))])))
+            final = text if len(self.calls) == 2 else '{"statements":[],"insufficient_evidence":true}'
+            return dict(stopReason='end_turn', output=dict(message=dict(role='assistant', content=[dict(text=final)])))
+    client = Client()
+    transport = BedrockFieldExtractor(Settings(data_dir=repo.data_dir), repo, client=client)
+    transport.gate.wait = lambda: None
+    result = AgenticRagService(repo, LocalEvidenceRetriever(repo), BedrockAgentModel(transport)).query(case.id, case.revision, '審查', True)
+    assert len(client.calls) == 3 and result['review'] is not None
+    assert result['statements'] == [] and result['tool_trace'] == [{'tool':'review_case','status':'success'}]
+
+
+def test_native_four_tool_batch_stays_within_query_budget(setup):
+    repo, case = setup
+    class Client:
+        def converse(self, **kwargs):
+            if len(kwargs['messages']) == 1:
+                calls = [dict(toolUseId='r'+str(i), name='get_rule', input={'rule_id': rule})
+                         for i, rule in enumerate(['width', 'road_width', 'depth'])]
+                calls.append(dict(toolUseId='review', name='review_case', input={}))
+                return dict(stopReason='tool_use', output=dict(message=dict(role='assistant', content=[dict(toolUse=c) for c in calls])))
+            return dict(stopReason='end_turn', output=dict(message=dict(role='assistant', content=[dict(text='{"statements":[],"insufficient_evidence":true}')])) )
+    transport = BedrockFieldExtractor(Settings(data_dir=repo.data_dir), repo, client=Client())
+    transport.gate.wait = lambda: None
+    result = AgenticRagService(repo, LocalEvidenceRetriever(repo), BedrockAgentModel(transport)).query(case.id, case.revision, '審查寬度與道路', True)
+    assert len(result['tool_trace']) == 4 and result['review'] is not None
+    assert all(t['status'] == 'success' for t in result['tool_trace'])

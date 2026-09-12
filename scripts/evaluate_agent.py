@@ -84,7 +84,7 @@ class RecordingModel:
     def __init__(self,delegate):self.delegate=delegate;self.results=[];self.turns=0
     def next_turn(self,context,history,tools):
         self.turns+=1
-        self.results=[r for step in history for r in step['results']]
+        self.results=[r for step in history for r in step.get('results', [])]
         return self.delegate.next_turn(context,history,tools)
 
 

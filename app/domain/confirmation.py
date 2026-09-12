@@ -27,6 +27,13 @@ def invalidate_confirmations(previous: Case | None, proposed: Case) -> Case:
         factors_changed |= changed
         if context_changed or changed:
             factor.confirmed = False
-    if context_changed or factors_changed or previous.totals != saved.totals:
+    if not saved.document_id or (previous and previous.document_id != saved.document_id):
+        saved.total_evidence = {}
+    elif previous:
+        for field in list(saved.total_evidence):
+            if getattr(previous.totals, field) != getattr(saved.totals, field):
+                del saved.total_evidence[field]
+    if (context_changed or factors_changed or previous.totals != saved.totals
+            or previous.total_evidence != saved.total_evidence):
         saved.totals_confirmed = False
     return saved

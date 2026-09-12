@@ -87,7 +87,9 @@ def parse_case(pages, title, ruleset):
               'weight':rf'試算價格[^\n]*?({NUM})%'}
     for name,pattern in patterns.items():
         m=re.search(pattern,text)
-        if m:setattr(case.totals,name,float(m[1].replace(',','')))
+        if m:
+            setattr(case.totals,name,float(m[1].replace(',','')))
+            case.total_evidence[name] = Evidence(page=comparison['page'], quote=m[0].strip()[:3000], method='layout-parser')
     detail=next((p for p in pages if '影響地價區域因素分析明細表' in p['text']),None)
     if detail:
         rows=re.findall(r'([^\n]*?)\s+[1-9]\s+(優|稍優|普通|稍劣|劣|無|有)\s+[1-9]\s+(優|稍優|普通|稍劣|劣|無|有)\s+('+NUM+r')\s*$',detail['text'],re.M)
@@ -98,7 +100,9 @@ def parse_case(pages, title, ruleset):
                 f.subject_grade=a;f.comparable_grade=b;f.entered_rate=float(rate.replace(',',''))
                 f.evidence=Evidence(page=detail['page'],quote=f'{quote.strip()} {a} / {b} / {rate}%',method='layout-parser')
         m=re.search(r'=\(1\)[^\n]*?\s{2,}('+NUM+r')[%％]',detail['text'])
-        if m:case.totals.regional_detail=float(m[1].replace(',',''))
+        if m:
+            case.totals.regional_detail=float(m[1].replace(',',''))
+            case.total_evidence['regional_detail'] = Evidence(page=detail['page'], quote=m[0].strip()[:3000], method='layout-parser')
     survey=next((p for p in pages if re.search(r'表\s*1\s*地[價价]區段勘查表',p['text'])),None)
     if survey:
         # Only unambiguous single-line measurements are extracted automatically.

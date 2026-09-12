@@ -25,9 +25,10 @@ def export_case(case, result, rules, kind: str, generated_at: str):
     if kind not in ['report','forms']:raise KeyError(kind)
     esc=lambda value:html.escape('—' if value is None else str(value))
     statuses={'pass':'通過','error':'疑似錯誤','pending':'待確認','missing':'資料不足'}
+    source_label=lambda row: ('原文 p.'+str(row['page']) if row.get('page') else '未記錄來源頁碼') + (' / 基準 p.'+str(row['rule_page']) if row.get('rule_page') else '')
     if kind=='report':
         head='<tr><th>檢核項目</th><th>狀態</th><th>原填</th><th>預期</th><th>依據與說明</th></tr>'
-        rows=''.join(f'<tr><td>{esc(r["title"])}</td><td>{statuses[r["status"]]}</td><td>{esc(r["actual"])}</td><td>{esc(r["expected"])}</td><td>{esc(r["message"])}<br>原文 p.{esc(r.get("page"))} / 基準 p.{esc(r.get("rule_page"))}</td></tr>' for r in result['checks'])
+        rows=''.join(f'<tr><td>{esc(r["title"])}</td><td>{statuses[r["status"]]}</td><td>{esc(r["actual"])}</td><td>{esc(r["expected"])}</td><td>{esc(r["message"])}<br>{esc(source_label(r))}</td></tr>' for r in result['checks'])
         content='<h2>逐項審查結果</h2><table>'+head+rows+'</table>'
     else:
         content=''

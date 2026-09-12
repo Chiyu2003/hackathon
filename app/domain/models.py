@@ -37,6 +37,10 @@ class Totals(StrictModel):
     weight: float | None = Field(default=None, ge=0, le=100)
 
 
+TotalField = Literal['regional_detail', 'regional_carried', 'individual', 'absolute',
+                     'time_rate', 'normal_price', 'adjusted_price', 'trial_price', 'weight']
+
+
 class Case(StrictModel):
     id: str = ''
     revision: int = 0
@@ -57,6 +61,8 @@ class Case(StrictModel):
     source_kind: str = 'manual'
     factors: list[Factor] = Field(default_factory=list,max_length=100)
     totals: Totals = Field(default_factory=Totals)
+    # Absent on legacy/manual cases; never infer a page from a form number.
+    total_evidence: dict[TotalField, Evidence] = Field(default_factory=dict)
     totals_confirmed: bool = False
     notes: str = Field(default='',max_length=12000)
     extraction_warnings: list[str] = Field(default_factory=list,max_length=100)

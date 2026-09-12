@@ -28,7 +28,7 @@ class ToolCall(Contract):
 
 
 class AgentTurn(Contract):
-    calls: tuple[ToolCall, ...] = Field(default=(), max_length=3)
+    calls: tuple[ToolCall, ...] = Field(default=(), max_length=8)
     answer: AnswerDraft | None = None
     # Opaque adapter-owned message preserves signatures/reasoning blocks across turns.
     continuation: dict = Field(default_factory=dict)
@@ -45,11 +45,15 @@ TOOL_INPUTS = {'search_evidence': SearchInput, 'read_source_page': ReadInput,
 TOOL_DESCRIPTIONS = {
     'search_evidence': 'Search uploaded applicable rules documents; you may reformulate the question and search again. Returns citation IDs.',
     'read_source_page': 'Read up to 2000 characters from a previously retrieved citation page; start is a character offset. Returns an exact citation.',
-    'get_rule': 'Inspect one configured factor in the case-bound ruleset. Does not certify the rule or compute values.',
+    'get_rule': 'Inspect one configured factor. rule_id must exactly equal a factors[].id (for example width), without a ruleset prefix. This returns configuration, NOT a document citation.',
     'review_case': 'Run the existing deterministic valuation review on the saved case. Use this for arithmetic; never calculate yourself.',
 }
 
 
-def tool_catalog():
-    return [dict(name=name, description=TOOL_DESCRIPTIONS[name], input_schema=model.model_json_schema())
+def tool_catalog(rule_ids=None):
+    catalog = [dict(name=name, description=TOOL_DESCRIPTIONS[name], input_schema=model.model_json_schema())
             for name, model in TOOL_INPUTS.items()]
+    if rule_ids is not None:
+        rule_tool = next(tool for tool in catalog if tool["name"] == "get_rule")
+        rule_tool["input_schema"]["properties"]["rule_id"]["enum"] = list(rule_ids)
+    return catalog

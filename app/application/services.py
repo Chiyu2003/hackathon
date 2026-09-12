@@ -1,5 +1,6 @@
 """Valuation use cases. No imports of FastAPI, AWS, Paddle or SQLite."""
 from app.application.drafts import parse_case
+from app.application.evidence import normalized
 from app.application.rag import RagService
 from app.application.ports import FieldExtractor, PdfReader, ReviewRepository, RevisionConflict
 from app.domain.engine import review
@@ -61,14 +62,19 @@ class ReviewService:
         if len(ids) != len(set(ids)):
             raise ValueError('因素 ID 不可重複。')
         if case.document_id:
-            self.repository.get_document(case.document_id)
+            document = self.repository.get_document(case.document_id)
+            pages = {page['page']: normalized(page['text']) for page in document['pages']}
+            for evidence in case.total_evidence.values():
+                quote = normalized(evidence.quote)
+                if not quote or quote not in pages.get(evidence.page, ''):
+                    raise ValueError('計算欄位的來源頁碼或引文不符原文。')
 
     def save_case(self, case: Case, *, new=False):
-        self.validate_case(case)
         previous = None if new else self.repository.get_case(case.id)
         if previous is not None and previous.revision != case.revision:
             raise RevisionConflict('案件已更新，請重新載入。')
         candidate = invalidate_confirmations(previous, case)
+        self.validate_case(candidate)
         saved = self.repository.save_case(candidate, '建立或匯入案件' if new else '儲存欄位與重新審查', new=new)
         return self.payload(saved)
 

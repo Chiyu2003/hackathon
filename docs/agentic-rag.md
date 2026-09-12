@@ -43,11 +43,12 @@ flowchart TD
 ## 執行邊界
 
 - application/agentic_rag.py 編排迴圈與工具執行，domain 保留估價運算。infrastructure/bedrock_agent.py 只轉換 Converse 的 toolUse／toolResult 訊息。
-- 每次查詢最多 5 輪模型回應、8 次工具呼叫；單輪最多 3 個工具。超限回傳明確錯誤，不無限循環。每次模型嘗試仍受既有共用鎖、節流與有限重試控制。
+- 每次查詢最多 5 輪模型回應、8 次工具呼叫；單輪共用剩餘工具預算，最多 8 個工具。超限回傳明確錯誤，不無限循環。每次模型嘗試仍受既有共用鎖、節流與有限重試控制。
 - 工具名稱及參數由 Pydantic 驗證，額外欄位拒收；不提供 eval、shell、任意 Python、保存、套用修正或修改規則的工具。
 - 案件 revision 在開始、每次模型呼叫前後及工具執行前核對；中途修改就中止。純計算使用開始時已保存的快照。
-- 問題、原文及工具內容視為資料。文件指令不能擴充工具權限。工具錯誤回傳固定訊息，模型可在預算內修正參數。
+- 問題、原文及工具內容視為資料。文件指令不能擴充工具權限。工具錯誤回傳固定訊息與本案合法 ID，模型可在預算內修正參數。get_rule 的 schema 也列出精確的因素 ID，不接受基準 ID 前綴。
 - 每段最終說明必須引用本次已取得的來源 ID；來源不足時無生成答案，但若曾呼叫 review_case，仍顯示真實審查結果。引用存在不代表語意支持，仍須人工核對。
+- 最終 JSON／引用格式錯誤或工具失敗後提前結束時，最多送一次修正回饋，仍計入五輪總上限。錯誤引用不會顯示；若已完成 review_case，最終答案仍無效時保留程式審查並顯示警語。原生截斷輸出、工具格式錯誤與超限仍回 503。
 - 工具紀錄是名稱與狀態，不是模型思考過程；不輸出隱藏推理。原始 assistant continuation 僅在 adapter 往返中保留。
 
 API：`POST /api/cases/{id}/agent-evidence`，body 為 `{"revision":1,"question":"寬度依據與審查","cloud_data_approved":true}`。回傳沿用 RAG hits／statements，增加 tool_trace 與 review；review 未呼叫時為 null。未同意回 400、過期 revision 回 409、模型或預算錯誤回 503。

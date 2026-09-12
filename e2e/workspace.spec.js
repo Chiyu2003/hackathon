@@ -13,6 +13,9 @@ test('dashboard, evidence, fix, edit, persist and export', async ({ page }) => {
     page.getByRole('button', { name: '建立錯誤示範' }).click(),
   ]);
   const sampleCase = (await sampleResponse.json()).case;
+  const manualTotal = page.locator('.check').filter({has:page.getByRole('heading',{name:'調整百分率絕對值加總',exact:true})});
+  await expect(manualTotal).toContainText('未記錄來源頁碼');
+  await expect(manualTotal.getByRole('button',{name:/原文 p\./})).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '金山區商業用地｜錯誤示範', exact: true })).toBeVisible();
   const road=page.locator('.check').filter({has:page.getByRole('heading',{name:'面前道路寬度',exact:true})});
   await road.getByRole('button',{name:'基準 p.7'}).click();
@@ -54,6 +57,7 @@ test('dashboard, evidence, fix, edit, persist and export', async ({ page }) => {
   const report=await page.request.get(href);
   expect(report.status()).toBe(200);
   expect(await report.text()).toContain('尚有疑點或待確認項目');
+  expect(await report.text()).toContain('未記錄來源頁碼');
   await page.getByRole('button',{name:'關閉',exact:true}).click();
   await page.getByRole('button',{name:'返回案件工作台',exact:true}).click();
   await page.getByRole('textbox',{name:'搜尋案件'}).fill('錯誤示範');

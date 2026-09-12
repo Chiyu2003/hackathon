@@ -1,0 +1,118 @@
+{
+  "mode": "real-bedrock",
+  "model": "qwen.qwen3-32b-v1:0",
+  "region": "us-west-2",
+  "prompt_version": "landwise-agent-v4",
+  "suite_sha256": "edea8408e950d9787e3ca5c01cdc93118bc9805b43d5f439c137a867c374e609",
+  "started_at": "2026-09-12T15:57:20.282672+00:00",
+  "data": "synthetic PDFs and synthetic single-factor rules only",
+  "aws_requests": 17,
+  "tokens": 29220,
+  "passed": true,
+  "results": [
+    {
+      "id": "rule_and_calculation",
+      "criteria": {
+        "required_tools": true,
+        "expected_status": true,
+        "no_tool_errors": true,
+        "source_scope_and_quotes": true,
+        "statement_citations": true,
+        "abstained": true,
+        "review_matches_engine": true,
+        "golden_numeric_result": true,
+        "golden_factor_status": true,
+        "not_false_complete": true,
+        "golden_matrix_rate": true,
+        "rule_tool_payload": true,
+        "case_and_audit_unchanged": true
+      },
+      "passed": true,
+      "model_turns": 3,
+      "elapsed_seconds": 3.68
+    },
+    {
+      "id": "no_source",
+      "criteria": {
+        "required_tools": true,
+        "expected_status": true,
+        "no_tool_errors": true,
+        "source_scope_and_quotes": true,
+        "statement_citations": true,
+        "abstained": true,
+        "empty_hits": true,
+        "case_and_audit_unchanged": true
+      },
+      "passed": true,
+      "model_turns": 2,
+      "elapsed_seconds": 2.06
+    },
+    {
+      "id": "wrong_version",
+      "criteria": {
+        "required_tools": true,
+        "expected_status": true,
+        "no_tool_errors": true,
+        "source_scope_and_quotes": true,
+        "statement_citations": true,
+        "abstained": true,
+        "empty_hits": true,
+        "case_and_audit_unchanged": true
+      },
+      "passed": true,
+      "model_turns": 2,
+      "elapsed_seconds": 2.33
+    },
+    {
+      "id": "missing_data",
+      "criteria": {
+        "required_tools": true,
+        "expected_status": true,
+        "no_tool_errors": true,
+        "source_scope_and_quotes": true,
+        "statement_citations": true,
+        "abstained": true,
+        "review_matches_engine": true,
+        "golden_numeric_result": true,
+        "golden_factor_status": true,
+        "not_false_complete": true,
+        "case_and_audit_unchanged": true
+      },
+      "passed": true,
+      "model_turns": 3,
+      "elapsed_seconds": 3.29
+    },
+    {
+      "id": "conflicting_sources",
+      "criteria": {
+        "required_tools": true,
+        "expected_status": true,
+        "no_tool_errors": true,
+        "source_scope_and_quotes": true,
+        "statement_citations": true,
+        "abstained": true,
+        "retrieved_documents": true,
+        "case_and_audit_unchanged": true
+      },
+      "passed": true,
+      "model_turns": 4,
+      "elapsed_seconds": 5.19
+    },
+    {
+      "id": "grounded_answer",
+      "criteria": {
+        "required_tools": true,
+        "expected_status": true,
+        "no_tool_errors": true,
+        "source_scope_and_quotes": true,
+        "statement_citations": true,
+        "answered": true,
+        "retrieved_documents": true,
+        "case_and_audit_unchanged": true
+      },
+      "passed": true,
+      "model_turns": 3,
+      "elapsed_seconds": 6.27
+    }
+  ]
+}
